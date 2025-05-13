@@ -1,71 +1,153 @@
 //package Scalable.Tasks.Task7;
-//import Scalable.Tasks.Task7.Models.FullUser;
-//import Scalable.Tasks.Task7.Models.UserCore;
-//import Scalable.Tasks.Task7.Models.UserExtra;
-//import Scalable.Tasks.Task7.Models.UserPreferences;
-//import com.fasterxml.jackson.databind.ObjectMapper;
-//import org.junit.jupiter.api.BeforeAll;
+//
+//import Scalable.Tasks.Task7.Repositories.UserCoreRepository1;
+//import Scalable.Tasks.Task7.Repositories.UserCoreRepository2;
+//import Scalable.Tasks.Task7.Repositories.UserCoreRepository3;
+//import Scalable.Tasks.Task7.Repositories.UserExtraRepository;
+//import Scalable.Tasks.Task7.Repositories.UserPreferencesRepository;
+//import Scalable.Tasks.Task7.Services.FullUserService;
+//import org.junit.jupiter.api.BeforeEach;
 //import org.junit.jupiter.api.Test;
-//import org.junit.jupiter.api.TestInstance;
 //import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.beans.factory.annotation.Value;
 //import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 //import org.springframework.boot.test.context.SpringBootTest;
-//import org.springframework.http.MediaType;
+//import org.springframework.jdbc.core.JdbcTemplate;
 //import org.springframework.test.web.servlet.MockMvc;
+//import org.springframework.transaction.annotation.Transactional;
 //
-//import java.util.Random;
-//
+//import static org.assertj.core.api.Assertions.assertThat;
 //import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 //import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 //import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 //import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 //
 //@SpringBootTest
+//@Transactional
 //@AutoConfigureMockMvc
-//@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-//public class Task7ApplicationTests {
+//public class Task7SolutionApplicationTests {
+//    @Value("${ID}")
+//    private String ID;
+//    @Autowired private MockMvc mockMvc;
+//    @Autowired private FullUserService service;
+//    @Autowired private UserCoreRepository1 repo1;
+//    @Autowired private UserCoreRepository2 repo2;
+//    @Autowired private UserCoreRepository3 repo3;
+//    @Autowired private UserExtraRepository extraRepo;
+//    @Autowired private UserPreferencesRepository prefsRepo;
+//    @Autowired private JdbcTemplate jdbcTemplate;
 //
-//	@Autowired
-//	private MockMvc mockMvc;
+//    @BeforeEach
+//    void clean() {
+//        // clear all tables before each test
+//        prefsRepo.deleteAll();
+//        extraRepo.deleteAll();
+//        jdbcTemplate.execute("TRUNCATE TABLE user_core RESTART IDENTITY CASCADE");
+//    }
 //
-//	@Autowired
-//	private ObjectMapper objectMapper;
+//    @Test
+//    void firstThousand_users_go_to_repo1_next_to_repo2() {
+//        int total = 1500;
+//        for (int i = 1; i <= total; i++) {
+//            service.createFullUser("user" + i, "pass" + i,
+//                    "First" + i, "Last" + i,
+//                    "u" + i + "@ex.com",
+//                    "0100000" + i,
+//                    "Addr" + i,
+//                    "light", true);
+//        }
 //
-//	private final Random random = new Random();
+//        // Verify distribution by ID ranges since repos share the same table
+//        // IDs 1-1000 go to repo1
+//        Integer count1 = jdbcTemplate.queryForObject(
+//                "SELECT COUNT(*) FROM user_core WHERE id <= 1000", Integer.class);
+//        assertThat(count1).isEqualTo(1000);
+//        // IDs 1001-2000 go to repo2
+//        Integer count2 = jdbcTemplate.queryForObject(
+//                "SELECT COUNT(*) FROM user_core WHERE id > 1000 AND id <= 2000", Integer.class);
+//        assertThat(count2).isEqualTo(500);
+//        // IDs above 2000 go to repo3
+//        Integer count3 = jdbcTemplate.queryForObject(
+//                "SELECT COUNT(*) FROM user_core WHERE id > 2000", Integer.class);
+//        assertThat(count3).isZero();
+//        // Extras and prefs still total
+//        assertThat(extraRepo.count()).isEqualTo(total);
+//        assertThat(prefsRepo.count()).isEqualTo(total);
 //
-//	@Test
-//	void whenPostTo52Prefix_thenCreatesFullUser() throws Exception {
-//		UserCore core = new UserCore("johndoe", "password123");
-//		UserExtra extra = new UserExtra();
-//		extra.setFirstName("John");
-//		extra.setLastName("Doe");
-//		extra.setEmail("john.doe@example.com");
-//		UserPreferences prefs = new UserPreferences();
-//		prefs.setTheme("dark");
-//		prefs.setNotificationsEnabled(true);
-//		FullUser payloadUser = new FullUser(core, extra, prefs);
+//        // extra and prefs should total 1500 across
+//        assertThat(extraRepo.count()).isEqualTo(total);
+//        assertThat(prefsRepo.count()).isEqualTo(total);
+//    }
 //
-//		mockMvc.perform(post("/52-1234")
-//						.contentType(MediaType.APPLICATION_JSON)
-//						.content(objectMapper.writeValueAsString(payloadUser)))
-//				.andExpect(status().isOk());
-//	}
+//    @Test
+//    void after_two_thousand_users_remaining_go_to_repo3() {
+//        int total = 2500;
+//        for (int i = 1; i <= total; i++) {
+//            service.createFullUser("u" + i, "p" + i,
+//                    "F" + i, "L" + i,
+//                    "u" + i + "@ex.com",
+//                    "011" + i,
+//                    "Addr" + i,
+//                    i % 2 == 0 ? "dark" : "light",
+//                    i % 2 == 0);
+//        }
 //
-//	@Test
-//	void whenGetRandomIdAfterSeeding_thenReturnsFullUserJson() throws Exception {
+//        // IDs 1-1000 go to repo1
+//        Integer count1 = jdbcTemplate.queryForObject(
+//                "SELECT COUNT(*) FROM user_core WHERE id <= 1000", Integer.class);
+//        assertThat(count1).isEqualTo(1000);
+//        // IDs 1001-2000 go to repo2
+//        Integer count2 = jdbcTemplate.queryForObject(
+//                "SELECT COUNT(*) FROM user_core WHERE id > 1000 AND id <= 2000", Integer.class);
+//        assertThat(count2).isEqualTo(1000);
+//        // IDs above 2000 go to repo3
+//        Integer count3 = jdbcTemplate.queryForObject(
+//                "SELECT COUNT(*) FROM user_core WHERE id > 2000", Integer.class);
+//        assertThat(count3).isEqualTo(500);
+//        assertThat(extraRepo.count()).isEqualTo(total);
+//        assertThat(prefsRepo.count()).isEqualTo(total);
+//    }
 //
-//		mockMvc.perform(post("/seed"))
-//				.andExpect(status().isOk());
+//    @Test
+//    void createAndGetFullUser_withValidData_returnsExpected() throws Exception {
+//        mockMvc.perform(post("/"+ID)
+//                        .param("username", "testuser")
+//                        .param("password", "pass123")
+//                        .param("firstName", "Test")
+//                        .param("lastName", "User")
+//                        .param("email", "test@example.com")
+//                        .param("phone", "0123456789")
+//                        .param("address", "123 Main St")
+//                        .param("theme", "dark")
+//                        .param("notificationsEnabled", "true")
+//                )
+//                .andExpect(status().isOk());
 //
-//		// Random ID between 2 and 2999
-//		int randomId = random.nextInt(1000) + 2;
+//        Integer count = jdbcTemplate.queryForObject(
+//                "SELECT COUNT(*) FROM user_core WHERE username = 'testuser'", Integer.class);
+//        assert count != null && count == 1;
+//    }
 //
-//		mockMvc.perform(get("/52-1234/{id}", randomId)
-//						.accept(MediaType.APPLICATION_JSON))
-//				.andExpect(status().isOk())
-//				.andExpect(jsonPath("$.userCore.username").exists())
-//				.andExpect(jsonPath("$.userExtra.email").exists())
-//				.andExpect(jsonPath("$.userPreferences.theme").exists());
-//	}
+//    @Test
+//    void whenGetFullUser_thenReturnsCorrectJson() throws Exception {
+//        // First create via params
+//        mockMvc.perform(post("/"+ID)
+//                        .param("username", "getuser")
+//                        .param("password", "pwd456")
+//                        .param("firstName", "Get")
+//                        .param("lastName", "User")
+//                        .param("email", "get@example.com")
+//                        .param("phone", "0987654321")
+//                        .param("address", "456 Elm St")
+//                        .param("theme", "light")
+//                        .param("notificationsEnabled", "false")
+//                )
+//                .andExpect(status().isOk());
+//
+//        mockMvc.perform(get("/"+ID+"/{id}", 1))
+//                .andExpect(status().isOk())
+//                .andExpect(jsonPath("$.userCore.username").value("getuser"))
+//                .andExpect(jsonPath("$.userExtra.email").value("get@example.com"))
+//                .andExpect(jsonPath("$.userPreferences.theme").value("light"));
+//    }
 //}
-//
